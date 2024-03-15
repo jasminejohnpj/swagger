@@ -13,7 +13,7 @@ const appointment = sequelize.define('appointment',{
    num_of_people : { type: DataTypes.INTEGER},
    pickup : { type: DataTypes.BOOLEAN},
    from : { type: DataTypes.STRING},
-   room: { type: DataTypes.STRING},
+   days: { type: DataTypes.STRING},
    emergencyNumber : { type: DataTypes.STRING},
    //appointment_time: { type: DataTypes.STRING},
    appointment_reason: { type: DataTypes.TEXT},
@@ -23,7 +23,11 @@ const appointment = sequelize.define('appointment',{
    payment:{ type:DataTypes.STRING},
    payment_method:{type : DataTypes.STRING},
    discount:{ type:DataTypes.INTEGER},
-   check_out:{ type: DataTypes.STRING}
+   check_out:{ type: DataTypes.STRING},
+   imageUrl:{ type:DataTypes.STRING},
+   feedback:{ type:DataTypes.TEXT},
+   externalUser:{ type:DataTypes.STRING, 
+    defaultValue:'false'},
 },
 {timestamps: false});
 sequelize.sync({alter:true})

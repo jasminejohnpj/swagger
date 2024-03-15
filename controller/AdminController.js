@@ -13,34 +13,33 @@ const appointment =require('../model/appointment');
 const bcrypt = require('bcrypt');
 
 
-
 router.put('/processPayment', async (request, response) => {
  
   // const userId = req.session.userId;
   const UId = request.body.UId;
-console.log(reg)
+//console.log(reg)
 try {
   // Find the user in the reg table by userId
  // const userReg = await reg.findByPk(userId);
 const userReg = await reg.findOne({
   where :{UId} })
-  console.log("............................",userReg.first_name);
+ // console.log("............................",userReg.first_name);
   if (!userReg) {
-     
+ 
     return response.status(404).json({ error: 'User not found' });
-
+ 
   }
-  console.log('userReg', userReg);
-
+  //console.log('userReg', userReg);
+ 
   // Update payment status to true
   await userReg.update({ payment: true });
-
+ 
   const res = await sequelize.query(`CALL referUser('${userReg.first_name}','${userReg.last_name}','${userReg.DOB}','${userReg.phone}','${userReg.email}','${userReg.state}','${userReg.district}','${userReg.UId}','${userReg.DOJ}')`);
-
+ 
   if (res) {
-      console.log(res)
+     // console.log(res)
       let LastUserID = res[0]['LastUserID'];
-      
+ 
       const referers = await sequelize.query(`CALL GetReferrerTreeWithCorrection('${LastUserID}')`);
       const list = referers[0];
       const list_of_referers = [
@@ -48,33 +47,33 @@ const userReg = await reg.findOne({
           list.Level_5_Referrer, list.Level_6_Referrer, list.Level_7_Referrer, list.Level_8_Referrer,
           list.Level_9_Referrer, list.First_ID
       ];
-
+ 
       for (const userID of list_of_referers) {
           const user = await Users.findByPk(userID);
-
-          
-
-          if(user.ban === false){
+ 
+ 
+ 
+          if( user && user.ban === false){
           if (user.coupons === 0) {
               user.points += 250;
               // user.distributed_points+=250;
               await user.save();
-
-
-
+ 
+ 
+ 
               if (user.points === 2500) {
                   user.points = 0;
                   user.coupons += 1;
                   user.distributed_points = 0;
                   user.distribute = true;
                   await user.save();
-
+ 
               }
-
+ 
           }
           else{
               if(user.distribute === true && user.Level != 1){
-                  console.log('Ready to distribute')
+                 // console.log('Ready to distribute')
                   const phil = await Users.findOne({
                       attributes: ['UserId', 'Level', 'points'],
                       where: {
@@ -85,24 +84,24 @@ const userReg = await reg.findOne({
                           coupons: {
                             [Op.lt]: user.coupons
                           },
-
+ 
                       },
                       limit: 1
                   });
-                  console.log()
+                 // console.log()
                   if (phil) {
                       const { UserId, Level, points } = phil;
-                      
-
+ 
+ 
                       console.log(UserId,Level,points)
-                     
+ 
                           await Users.update({ points: points + 250 }, { where: { UserId } });
                           user.distributed_points+=250;
                           user.reserved_id+=250;
                           await user.save()
-                          console.log(user.distribute,'distribution')
+                          //console.log(user.distribute,'distribution')
                           let updated_user = await Users.findByPk(UserId);
-
+ 
                           if(user.distributed_points === 2500){
                               user.distribute = false;
                               await user.save()
@@ -112,27 +111,27 @@ const userReg = await reg.findOne({
                               updated_user.coupons += 1;
                               await updated_user.save();
                           }
-                          
-                         
-  
-
-                      
+ 
+ 
+ 
+ 
+ 
                   } //if
                    else{
                               user.points += 250;
                               // user.distributed_points+=250;
                               user.reserved_id+=250;
                               await user.save();
-      
-      
-      
+ 
+ 
+ 
                               if (user.points === 2500) {
-
+ 
                                   user.points = 0;
                                   user.coupons += 1;
                                   user.distributed_points = 0;
                                   await user.save();
-      
+ 
                               }
                           }
               } //distribute
@@ -146,12 +145,12 @@ const userReg = await reg.findOne({
                       user.distributed_points = 0;
                       user.distribute = true;
                       await user.save();
-
+ 
                   }
               }
           }
-
-          
+ 
+ 
       }//else
       else{
           const thasmai_id = 1;
@@ -159,28 +158,27 @@ const userReg = await reg.findOne({
         thasmai.points += 250;
         // user.distributed_points+=250;
         await thasmai.save();
-
-
-
+ 
+ 
+ 
         if (thasmai.points === 2500) {
             thasmai.points = 0;
             thasmai.coupons += 1;
             await thasmai.save();
-
+ 
         }
-
+ 
       }
   }
-  
+ 
 }
     return response.status(200).json({ message: 'Payment processed and data copied successfully' });
   } catch (error) {
-    console.error('Error:', error);
+    //console.error('Error:', error);
     return response.status(500).json({ error: 'Internal Server Error' });
   }
-
+ 
 });
-
 
 router.get('/findall',async(request,response)=>{
     console.log('findall')
@@ -253,7 +251,6 @@ router.post('/closeuser', async (req, res) => {
       return res.status(500).json({ status: "error", message: "Internal server error" });
   }
 });
-
 
 router.get('/search', async (req, res) => {
     try {

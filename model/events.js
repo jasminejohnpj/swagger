@@ -8,17 +8,20 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
 });
 const events = sequelize.define('events', {
     event_name: { type: DataTypes.STRING},
-    event_description: { type: DataTypes.STRING},
+    event_description: { type: DataTypes.TEXT},
     priority: { type: DataTypes.STRING},
     place: { type: DataTypes.STRING},
-    date: {type: DataTypes.DATE},
+    date: {type: DataTypes.STRING},
+    event_time: {type: DataTypes.STRING},
     image: {
-        type:DataTypes.BLOB
-    }    
- });
+        type:DataTypes.STRING,allowNull:true
+    },
+    
+     
+ },{timestamps : false});
 
 
-events.sync()
+events.sync({alter:true})
     .then((data) => {
        
         console.log('events table created');

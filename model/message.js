@@ -11,7 +11,9 @@ const message = sequelize.define('message',{
     UId: { type: DataTypes.INTEGER},
     message: { type: DataTypes.TEXT},
     messageTime: { type: DataTypes.STRING},
-    message_priority: { type: DataTypes.STRING},
+    messagetype: { type: DataTypes.STRING},
+    isAdminMessage:{type: DataTypes.STRING},
+    message_priority : {type:DataTypes.STRING}
 
 });
 sequelize.sync({alter:true})

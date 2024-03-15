@@ -17,13 +17,16 @@ const { validationResult } = require('express-validator');
 const Broadcast =require('../model/broadcast');
 const admin =require('firebase-admin');
 const serviceAccount = require("../serviceAccountKey.json");
-const appointment =require('../model/appointment');
+const Appointment = require("../model/appointment");
 const supportcontact =require('../model/supportContactConfig');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
+const GroupMembers = require('../model/groupmembers');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   storageBucket: "gs://thasmai-star-life.appspot.com"
 });
-
+const storage = admin.storage().bucket();
 
 router.get('/register-count', async (req, res) => {
   try {
@@ -132,25 +135,47 @@ router.get('/beneficiaries', async (req, res) => {
       return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-router.post('/add-event', async (req, res) => {
+router.post('/add-event', upload.single('image'), async (req, res) => {
+  const { event_name, event_description, priority, place, date ,event_time } = req.body;
+  const eventImageFile = req.file;
+  
   try {
-    const { event_name, event_description, priority, place, date } = req.body;
-   // const image = req.file.buffer; 
-
     
+    if (!event_name || !event_description || !priority || !place || !date) {
+      return res.status(400).send({ error: 'Missing required fields' });
+    }
+
     const newEvent = await events.create({
       event_name,
       event_description,
       priority,
       place,
       date,
-    //  image,
+      event_time
     });
 
-    res.status(201).send({ message: 'Event created successfully', event: newEvent });
+    
+    let image = ''; 
+    if (eventImageFile) {
+      const eventImagePath = `event_image/${newEvent.id}/${eventImageFile.originalname}`;
+
+      
+      await storage.upload(eventImageFile.path, {
+        destination: eventImagePath,
+        metadata: {
+          contentType: eventImageFile.mimetype
+        }
+      });
+
+      image = `gs://${storage.name}/${eventImagePath}`;
+    }
+
+    await newEvent.update({ image });
+
+    res.status(201).json({ message: 'Event created successfully', event: newEvent });
   } catch (error) {
     console.log(error);
-    res.status(500).send({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -168,6 +193,7 @@ router.get('/events', async (req, res) => {
         priority: event.priority,
         place: event.place,
         date: event.date,
+        event_time : event.event_time
        // image: event.image.toString('base64'), 
       };
     });
@@ -179,27 +205,98 @@ router.get('/events', async (req, res) => {
   }
 });
 
-router.put('/update-events/:eventId', async (req, res) => {
+router.put('/update-event/:id', upload.single('image'), async (req, res) => {
+  const id = req.params.id;
+  const userData = req.body;
+  const eventImageFile = req.file;
+
   try {
-      const eventId = req.params.eventId;
-      const eventDataToUpdate = req.body;
+    // Check if the user is authenticated
+    if (!id) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-      const event = await events.findByPk(eventId);
+    // Find the user by UId
+    const user = await events.findOne({ where: { id } });
 
-      if (!event) {
-          return res.status(404).json({ error: 'Event not found' });
+    // Update user details
+    if (user) {
+      // Update all fields provided in the request, excluding the profilePic field
+      delete userData.image; // Remove profilePic from userData
+      await user.update(userData);
+
+      // Fetch current profile picture URL
+      let currentProfilePicUrl = user.image;
+
+      // Store or update profile picture in Firebase Storage
+      let image = currentProfilePicUrl; // Default to current URL
+      if (eventImageFile) {
+        const profilePicPath = `event_image/${id}/${eventImageFile.originalname}`;
+        // Upload new profile picture to Firebase Storage
+        await storage.upload(eventImageFile.path, {
+          destination: profilePicPath,
+          metadata: {
+            contentType: eventImageFile.mimetype
+          }
+        });
+
+        // Get the URL of the uploaded profile picture
+        image = `gs://${storage.name}/${profilePicPath}`;
+
+        // Delete the current profile picture from Firebase Storage
+        if (currentProfilePicUrl) {
+          const currentProfilePicPath = currentProfilePicUrl.split(storage.name + '/')[1];
+          await storage.file(currentProfilePicPath).delete();
+        }
       }
 
-      await event.update(eventDataToUpdate);
+      // Update user's profilePicUrl in reg table
+      await user.update({ image });
 
-     
-          await event.save();
- 
-
-      res.status(200).json({ message: 'Event updated successfully' });
+      return res.status(200).json({ message: 'event details updated successfully' });
+    } else {
+      return res.status(404).json({ error: 'User not found' });
+    }
   } catch (error) {
-      console.log(error);
-      res.status(500).json({ error: 'Internal Server Error' });
+    //console.error(error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.get('/get-event/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch user details by UId from the reg table
+    const user = await events.findOne({ where: { id } });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let image = null;
+    if (user.image) {
+      // If profilePicUrl exists, fetch the image URL from Firebase Storage
+      const file = storage.file(user.image.split(storage.name + '/')[1]);
+      const [exists] = await file.exists();
+      if (exists) {
+        image = await file.getSignedUrl({
+          action: 'read',
+          expires: '03-01-2500' // Adjust expiration date as needed
+        });
+      }
+    }
+
+    // Send the response with user data including profilePicUrl
+    return res.status(200).json({
+      user: {
+        ...user.toJSON(),
+        image
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 router.delete('/delete-events/:eventId', async (req, res) => {
@@ -549,6 +646,7 @@ router.get('/TSL', async (req, res) => {
   }
 });
 const ExcelJS = require('exceljs');
+const groupmembers = require('../model/groupmembers');
 
 router.get('/download', async (req, res) => {
   try {
@@ -882,6 +980,7 @@ router.get('/complexfilter', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
 router.post('/execute-query', async (req, res) => {
   try {
     const queryConditions = req.body.queryConditions;
@@ -1133,7 +1232,7 @@ router.get('/list-users', async (req, res) => {
     const UIds = usersList.map(user => user.UId);
 
     // Step 2: Fetch the total sum of distributed_coupons for each UId
-    const distributionResults = await distribution.findAll({
+    const distributionResults = await Distribution.findAll({
       where: { UId: { [Op.in]: UIds } },
       attributes: ['UId', [sequelize.fn('sum', sequelize.col('distributed_coupons')), 'total_distributed_coupons']],
       group: ['UId'],
@@ -1246,81 +1345,118 @@ router.get('/search', async (req, res) => {
 
 router.get('/list-all-appointment', async (req, res) => {
   try {
-    const appointmentData = await appointment.findAll();
+    // Find all appointments
+    const appointments = await Appointment.findAll();
 
-    if (!appointmentData || appointmentData.length === 0) {
-      return res.status(404).json({ message: 'No appointments found' });
-    }
-    const UIds = appointmentData.map(appointment => appointment.UId);
+    // Fetch group members and coupons for each appointment
+    const appointmentsWithGroupMembersAndCoupons = [];
+    for (const appointment of appointments) {
+      const groupMembers = await GroupMembers.findAll({ where: { appointmentId: appointment.id } });
+      const user = await Users.findOne({ where: { UId: appointment.UId }, attributes: ['coupons'] });
 
-    const userData = await Users.findAll({
-      where: { UId: { [Op.in]: UIds } },
-      attributes: ['UId', 'coupons'],
-    });
-    const userCouponMap = new Map(userData.map(user => [user.UId, user.coupons]));
-
-    const mergedResults = appointmentData.map(appointment => {
-      const userCoupons = userCouponMap.get(appointment.UId) || 0;
-      return {
-        ...appointment.dataValues,
-        userCoupons,
+      // Create a merged object for each appointment
+      const mergedAppointmentData = {
+        appointment,
+        groupMembers,
+        user // Only includes coupon-related data
       };
-    });
 
-    res.json({ message: 'Success', data: mergedResults });
+      appointmentsWithGroupMembersAndCoupons.push(mergedAppointmentData);
+    }
+
+    // Respond with the list of merged appointment data
+    return res.status(200).json({ message: 'Fetching appointments', appointments: appointmentsWithGroupMembersAndCoupons });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
 router.get('/list-appointment/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
     // Find appointment by ID
-    const appointmentData = await appointment.findOne({ where: { id } });
+    const appointment = await Appointment.findOne({ where: { id } });
 
-    if (!appointmentData) {
+    if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    // Send appointment details as response
-    return res.status(200).json(appointmentData);
+    // Find group members for the appointment
+    const groupMembers = await GroupMembers.findAll({ where: { appointmentId: appointment.id } });
+
+    // Attach group members to the appointment object
+    appointment.dataValues.groupMembers = groupMembers;
+
+    // Respond with the appointment
+    return res.status(200).json({ message: 'Fetching appointment', appointment });
   } catch (error) {
-    console.error('Error:', error);
+    console.error(error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-router.put('/update-payment/:id', async (req, res) => {
-  const id = req.params.id;  // Corrected to access the ID from the parameters
-  const { check_out, payment, payment_method, appointment_status } = req.body;
+
+router.put('/update-payment/:id', upload.single('appointmentImage'), async (req, res) => {
+
+  //console.log('update')
+  const id = req.params.id;
+  const appointmentData = req.body;
+  const appointmentImageFile = req.file;
 
   try {
+      // Check if the user is authenticated
       if (!id) {
-          return res.status(400).json({ error: 'ID not found' });
+          return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const dataToUpdate = {
-          check_out,
-          payment,
-          payment_method,
-          appointment_status
-      };
+      // Find the appointment by id
+      const appointment = await Appointment.findOne({ where: { id } }); // Corrected variable name
 
-      const updatedAppointment = await appointment.update(dataToUpdate, {
-          where: { id: id } // Corrected to specify the appointment ID to update
-      });
+      // Update appointment details
+      if (appointment) {
+          // Update all fields provided in the request, excluding the appointmentImage field
+          delete appointmentData.appointmentImage; // Remove appointmentImage from appointmentData
+          await appointment.update(appointmentData);
 
-      if (updatedAppointment[0] === 1) {
-          return res.status(200).json({ message: 'Appointment updated successfully' });
+          // Store or update appointment image
+          let appointmentImageUrl = appointment.imageUrl; // Default to current URL
+          if (appointmentImageFile) {
+              const appointmentImagePath = `appointment_images/${id}/${appointmentImageFile.originalname}`;
+
+              // Upload new appointment image to Firebase Storage
+              await storage.upload(appointmentImageFile.path, {
+                  destination: appointmentImagePath,
+                  metadata: {
+                      contentType: appointmentImageFile.mimetype
+                  }
+              });
+
+              // Get the URL of the uploaded appointment image
+              appointmentImageUrl = `gs://${storage.name}/${appointmentImagePath}`;
+//console.log(appointmentImageUrl);
+              // Delete the current appointment image from Firebase Storage
+              if (appointment.imageUrl) {
+                  const currentAppointmentImagePath = appointment.imageUrl.split(storage.name + '/')[1];
+                  await storage.file(currentAppointmentImagePath).delete();
+              }
+          }
+
+          // Update appointment's imageUrl in appointment table
+          await appointment.update({ imageUrl: appointmentImageUrl });
+
+          return res.status(200).json({ message: 'Appointment details updated successfully' });
       } else {
           return res.status(404).json({ error: 'Appointment not found' });
       }
   } catch (error) {
-      console.error('Error:', error);
+      //console.error(error);
       return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
 router.put('/discount/:UId', async (req, res) => {
   const { UId } = req.params;
   const { coupon, id } = req.body;
@@ -1351,7 +1487,7 @@ router.put('/discount/:UId', async (req, res) => {
     await Users.update({ coupons: updatedTotalCoupons }, { where: { UId } });
 
     // Assuming 'appointment' is a model with a proper 'where' condition for the update
-    await appointment.update({ discount: coupon * 2500 }, { where: { id } });
+    await Appointment.update({ discount: coupon * 2500 }, { where: { id } });
 
     return res.status(200).json({ message: 'Discount updated successfully' });
   } catch (error) {
