@@ -1613,6 +1613,7 @@ router.get('/flag', async (req, res) => {
  *                 error:
  *                   type: string
  *                   description: Error message indicating question not found
+ *                   
  *       '500':
  *         description: Internal Server Error
  *         content:
@@ -1655,7 +1656,7 @@ router.get('/rulesAndConditions', async (req, res) => {
 
 /**
  * @swagger
- * /User/getUserById/{UId}:
+ * /User/getUserById:
  *   get:
  *     summary: Get user by UId
  *     description: Retrieve user details by their unique identifier (UId).
@@ -1676,9 +1677,9 @@ router.get('/rulesAndConditions', async (req, res) => {
  *                     id:
  *                       type: integer
  *                       description: User's ID
- *                     name:
+ *                     username:
  *                       type: string
- *                       description: User's name
+ *                       description: User's username
  *                     email:
  *                       type: string
  *                       description: User's email
