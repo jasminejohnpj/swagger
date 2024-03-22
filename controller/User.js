@@ -61,7 +61,7 @@ const GroupMembers = require('../model/groupmembers');
  *           type: string
  *         phone:
  *           type: string
- *         reference :
+ *         reference:
  *           type: string
  *         languages:
  *           type: string
@@ -69,18 +69,15 @@ const GroupMembers = require('../model/groupmembers');
  *           type: string
  *         verify:
  *           type: string
- *         userId :
+ *         userId:
  *           type: integer
  *         DOJ:
- *           type: string 
+ *           type: string
  *         password:
  *           type: string
- *         classAttended:
+ *         profilePic:
  *           type: string
- *         createdAt :
- *           type: string
- *         updatedAt:
- *           type: string
+ *           format: binary
  *     BankDetails:
  *       type: object
  *       properties:
@@ -96,13 +93,52 @@ const GroupMembers = require('../model/groupmembers');
  *           type: string
  *         accountNo:
  *           type: string
- *         createdAt :
+ *         createdAt:
  *           type: string
  *         updatedAt:
  *           type: string
  *         regId:
  *           type: integer
+ *     Appointment:
+ *       type: object
+ *       properties:
+ *         appointmentDate:
+ *           type: string
+ *         num_of_people:
+ *           type: integer
+ *         pickup:
+ *           type: boolean
+ *         days:
+ *           type: string
+ *         from:
+ *           type: string
+ *         emergencyNumber:
+ *           type: string
+ *         appointment_reason:
+ *           type: string
+ *         register_date:
+ *           type: string
+ *         externalUser:
+ *           type: boolean
+ *         feedback:
+ *           type: Text
+ *         rating:
+ *           type: string
+ *         groupmembers:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/GroupMember'
+ *     GroupMember:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         name:
+ *           type: string
+ *         age:
+ *           type: integer
  */
+
 
 router.get('/getAllUsers', async (req, res) => {
   try {
@@ -869,26 +905,31 @@ router.get('/list-questions', async (req, res) => {
 router.post("/appointment", async (req, res) => {
   try {
     const UId = req.session.UId;
+    if (!UId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
     const {
- 
+      
       appointmentDate,
       num_of_people,
       pickup,
       room,  
       from,
+      days,
       emergencyNumber,
+      appointment_time,
       appointment_reason,
       register_date,
       groupmembers,
       externalUser
     } = req.body;
- 
+
     const existingUser = await Users.findOne({ where: { UId } });
- 
+
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
     }
- 
+
     const newAppointment = await Appointment.create({
       UId: existingUser.UId,
       phone: existingUser.phone,
@@ -897,14 +938,16 @@ router.post("/appointment", async (req, res) => {
       pickup,
       room,
       from,
+      days,
       emergencyNumber,
+      appointment_time,
       appointment_reason,
       register_date,
       user_name: existingUser.firstName + " " + existingUser.secondName,
       appointment_status: "Not Arrived",
       externalUser
     });
- 
+
     if (Array.isArray(groupmembers) && groupmembers.length > 0) {
       const groupMembersData = groupmembers.map(groupMember => ({
         name: groupMember.name,
@@ -912,10 +955,10 @@ router.post("/appointment", async (req, res) => {
         age: groupMember.age,
         appointmentId: newAppointment.id,
       }));
- 
+console.log(groupMembersData)
       await GroupMembers.bulkCreate(groupMembersData); // Fixed the function call
     }
- 
+
     return res.status(200).json({
       message: 'Appointment has been allocated successfully! We will notify guruji soon.',
     });
@@ -1132,7 +1175,6 @@ router.delete('/delete-appointment', async (req, res) => {
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
  
 //////////////////update Appointment/////////////////////////////
 
@@ -1140,71 +1182,28 @@ router.delete('/delete-appointment', async (req, res) => {
  * @swagger
  * /User/updateAppointment/{id}:
  *   put:
- *     summary: Update an appointment and its associated group members
- *     description: Endpoint to update an appointment and its associated group members
+ *     summary: Update appointment details and group members
+ *     description: Update appointment details and group members by appointment ID
  *     tags:
  *       - Appointments
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
+ *         description: ID of the appointment to update
  *         schema:
  *           type: integer
- *         description: ID of the appointment to update
  *       - in: body
+ *         name: updateFields
+ *         description: Fields to update in the appointment
  *         required: true
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 appointmentDate:
- *                   type: string
- *                   description: The updated date of the appointment
- *                 num_of_people:
- *                   type: integer
- *                   description: The updated number of people attending the appointment
- *                 pickup:
- *                   type: boolean
- *                   description: If pickup is needed
- *                 days:
- *                   type: string
- *                   description: Number of days they stay
- *                 from:
- *                   type: string
- *                   description: The pickup location
- *                 emergencyNumber:
- *                   type: string
- *                   description: The updated emergency contact number
- *                 appointment_reason:
- *                   type: string
- *                   description: The updated reason for the appointment
- *                 register_date:
- *                   type: string
- *                   description: The updated registration date
- *                 externalUser:
- *                   type: boolean
- *                   description: Indicates if the member is external
- *                 groupmembers:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         description: ID of the group member
- *                       name:
- *                         type: string
- *                         description: Name of the group member
- *                       relation:
- *                         type: string
- *                         description: Relationship with the user
- *                       age:
- *                         type: integer
- *                         description: Age of the group member
+ *               $ref: '#/components/schemas/Appointment'
  *     responses:
- *       200:
- *         description: Appointment and group members updated successfully
+ *       '200':
+ *         description: Appointment and GroupMembers updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -1212,8 +1211,8 @@ router.delete('/delete-appointment', async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
- *                   description: Success message
- *       404:
+ *                   description: Success message indicating update completion
+ *       '404':
  *         description: Appointment not found
  *         content:
  *           application/json:
@@ -1222,8 +1221,8 @@ router.delete('/delete-appointment', async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   description: Error message
- *       500:
+ *                   description: Error message indicating appointment not found
+ *       '500':
  *         description: Internal Server Error
  *         content:
  *           application/json:
@@ -1232,32 +1231,31 @@ router.delete('/delete-appointment', async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   description: Internal Server Error message
+ *                   description: Internal server error message
  */
-
 
 router.put('/updateAppointment/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updateFields = req.body;
- console.log(updateFields);
+
     // Check if appointment exists
     const appointment = await Appointment.findOne({ where: { id } });
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
- 
+
     // Update Appointment
     const [appointmentResult] = await Appointment.update(updateFields, {
       where: { id },
     });
    // console.log(".......................",[appointmentResult]);
- 
+
     // Update or create GroupMembers
     if (updateFields.groupmembers && Array.isArray(updateFields.groupmembers)) {
- 
+      
       const groupMembersUpdates = updateFields.groupmembers.map(async (groupMember) => {
-        //console.log(groupMember.id);
+        console.log(groupMember.id);
         if (groupMember.id) {
          //console.log("enter");
           // Update existing group member if ID exists
@@ -1277,13 +1275,14 @@ router.put('/updateAppointment/:id', async (req, res) => {
       });
       await Promise.all(groupMembersUpdates);
     }
- 
+
     return res.status(200).json({ message: 'Appointment and GroupMembers updated successfully' });
   } catch (error) {
-    //console.error('Error updating appointment and group members:', error);
+    console.error('Error updating appointment and group members:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
 
 /////////////////////////// delete group member//////////////////
 
@@ -1359,9 +1358,358 @@ router.delete('/group-members/:id', async (req, res) => {
 });
 
 
-router.get('/getUserById/:UId', async (req, res) => {
+////////////////////////////Rating/////////////////////
+
+/**
+ * @swagger
+ * /User/rating/{id}:
+ *   put:
+ *     summary: Update appointment rating
+ *     description: Update the rating of an appointment by ID
+ *     tags:
+ *       - Rating
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the appointment to update rating
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               rating:
+ *                 type: string
+ *                 description: The new rating for the appointment
+ *     responses:
+ *       '200':
+ *         description: Rating updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   description: Success message indicating rating update completion
+ *       '404':
+ *         description: Appointment not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message indicating appointment not found
+ *       '500':
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Internal server error message
+ */
+
+router.put('/rating/:id', async (req, res) => {
+  const id = req.params.id;
+  const rating = req.body.rating;
+
+  try {
+    const appointment = await Appointment.findOne({ where: { id: id } });
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    await Appointment.update({ rating: rating }, { where: { id: id } });
+
+    return res.status(200).json({ message: 'Rating updated successfully' });
+  } catch (error) {
+    console.error('Error updating rating:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/////////////////////////Guruji dates////////////////////
+
+/**
+ * @swagger
+ * /User/guruji-date:
+ *   get:
+ *     summary: Get Guruji date from application config
+ *     description: Retrieve Guruji date from the application configuration
+ *     tags:
+ *       - Guruji Date
+ *     responses:
+ *       '200':
+ *         description: Application config retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   description: Success message indicating config retrieval
+ *                 values:
+ *                   type: object
+ *                   description: Application config values
+ *       '404':
+ *         description: Application config not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message indicating config not found
+ *       '500':
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Internal server error message
+ */
+
+router.get('/guruji-date', async (req, res) => {
+  try {
+    const  id  = 11;
+
+    // Find the application config record by ID
+    const config = await applicationconfig.findByPk(id);
+
+    // If the record exists, parse the JSON value and send it in the response
+    if (config) {
+      const values = JSON.parse(config.value);
+      return res.status(200).json({ message: 'Application config retrieved successfully', values });
+    } else {
+      return res.status(404).json({ error: 'Application config not found' });
+    }
+  } catch (error) {
+    console.error('Error retrieving application config:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+/////////////////Flags///////////////////////
+
+/**
+ * @swagger
+ * /User/flag:
+ *   get:
+ *     summary: Get user flag status
+ *     description: Retrieve the flag status of the user based on the session UId
+ *     tags:
+ *       - User Flag
+ *     responses:
+ *       '200':
+ *         description: User flag status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: object
+ *                   properties:
+ *                     isans:
+ *                       type: boolean
+ *                       description: Flag status indicating if the user is ANS or not
+ *                   description: Success message indicating flag status retrieval
+ *       '404':
+ *         description: User or session UId not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message indicating user or session UId not found
+ *       '500':
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Internal server error message
+ */
+
+router.get('/flag', async (req, res) => {
+  try {
+    // Retrieve UId from the session
+    const UId = req.session.UId;
+
+    // Check if UId exists in the session
+    if (!UId) {
+      return res.status(404).json({ error: 'invalid UId' });
+    }
+
+    // Find the user by UId
+    const user = await reg.findOne({ where: { UId } });
+
+    // Check if user exists
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Return the isans status of the user
+    return res.status(200).json({ message: { isans: user.isans} });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+///////////////////////Rules and conditions//////////////////////
+
+/**
+ * @swagger
+ * /User/rulesAndConditions:
+ *   get:
+ *     summary: Get rules and conditions
+ *     description: Retrieve rules and conditions based on the question ID
+ *     tags:
+ *       - Rules and Conditions
+ *     responses:
+ *       '200':
+ *         description: Rules and conditions retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   description: Success message indicating rules and conditions retrieval
+ *                 condition:
+ *                   type: string
+ *                   description: The condition value retrieved based on the question ID
+ *       '404':
+ *         description: Question not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message indicating question not found
+ *       '500':
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Internal server error message
+ */
+
+
+router.get('/rulesAndConditions', async (req, res) => {
+  try {
+    // Extract the questionId from the request parameters
+    const  questionId  = 1;
+
+    // Fetch the question from the database by questionId
+    const question = await questions.findByPk(questionId);
+
+    // Check if the question exists
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    // Extract the value from the condition field
+    const conditionValue = question.condition;
+
+    // Return the condition value in the API response
+    return res.status(200).json({ message: 'Condition value retrieved successfully', condition: conditionValue });
+  } catch (error) {
+    console.error('Error retrieving condition value:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+//////////////////get user details/////////////////////
+
+/**
+ * @swagger
+ * /User/getUserById/{UId}:
+ *   get:
+ *     summary: Get user by UId
+ *     description: Retrieve user details by their unique identifier (UId).
+ *     tags:
+ *       - User
+ *     responses:
+ *       '200':
+ *         description: Successful operation
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   description: User details
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       description: User's ID
+ *                     name:
+ *                       type: string
+ *                       description: User's name
+ *                     email:
+ *                       type: string
+ *                       description: User's email
+ *                     profilePicUrl:
+ *                       type: string
+ *                       description: URL of user's profile picture
+ *       '404':
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message indicating user not found
+ *       '500':
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Internal server error message
+ */
+
+router.get('/getUserById', async (req, res) => {
     try {
-      const { UId } = req.params;
+      const { UId } = req.session;
   
       // Fetch user details by UId from the reg table
       const user = await reg.findOne({ where: { UId } });
@@ -1396,7 +1744,12 @@ router.get('/getUserById/:UId', async (req, res) => {
     }
   });
 
-  router.put('/updateUser', upload.single('profilePic'), async (req, res) => {
+
+  
+
+
+
+router.put('/updateUser', upload.single('profilePic'), async (req, res) => {
     const UId = req.session.UId;
     const userData = req.body;
     const profilePicFile = req.file;
@@ -1454,6 +1807,8 @@ router.get('/getUserById/:UId', async (req, res) => {
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   });
+
+
 router.get('/reference', async (req, res) => {
   const UId = req.session.UId;
 
@@ -1474,6 +1829,8 @@ router.get('/reference', async (req, res) => {
       res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+
 router.post('/meditation', async (req, res) => {
     try {
       const { userId } = req.session;
@@ -2050,6 +2407,8 @@ router.get('/reg-confiq', async (req, res) => {
       return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
 
 
 

@@ -31,8 +31,8 @@ const options = {
         },
     servers: [
         {
-               url: "https://thasmai.tstsvc.in/api/v1/"
-            //url: "http://localhost:5000/api/v1/"
+              // url: "https://thasmai.tstsvc.in/api/v1/"
+            url: "http://localhost:5000/api/v1/"
         }
     ],
 },

@@ -26,6 +26,7 @@ const appointment = sequelize.define('appointment',{
    check_out:{ type: DataTypes.STRING},
    imageUrl:{ type:DataTypes.STRING},
    feedback:{ type:DataTypes.TEXT},
+   rating:{type:DataTypes.STRING},
    externalUser:{ type:DataTypes.STRING, 
     defaultValue:'false'},
 },

@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const { DataTypes, Sequelize } = require('sequelize');
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
@@ -48,25 +47,14 @@ const reg = sequelize.define('reg', {
     },
     classAttended: { type: DataTypes.STRING, defaultValue: 'false' },
     ans : { type: DataTypes.STRING },
+    isans : { type: DataTypes.BOOLEAN, defaultValue:false},
     other: { type: DataTypes.STRING},
-    profilePicUrl: { type: DataTypes.STRING, allowNull: true }
+    profilePicUrl: { type: DataTypes.STRING, allowNull: true },
+    maintanance_fee: { type: DataTypes.STRING, defaultValue:'false'},
+    
  });
-// const BankDetails = sequelize.define('bankDetails', {
-//     AadarNo: { type: DataTypes.INTEGER,defaultValue:0 },
-//     IFSCCode: { type: DataTypes.STRING,defaultValue:""},
-//     branchName: { type: DataTypes.STRING,defaultValue:""},
-//     accountName: { type: DataTypes.STRING,defaultValue:""},
-//     accountNo: { type: DataTypes.INTEGER,defaultValue:0},
-//     UId: {
-//         type: DataTypes.INTEGER,
-//         defaultValue: 0,
-//       },
-// });
-// BankDetails.belongsTo(reg, { foreignKey: 'UId' });
-//reg.hasOne(BankDetails);
 
-
-sequelize.sync({alter: false})
+sequelize.sync({alter: true})
     .then((data) => {
        // console.log(data);
         console.log('reg table created');
@@ -80,6 +68,3 @@ sequelize.sync({alter: false})
 
 
 module.exports = { reg,sequelize };
-
-
-

@@ -22,6 +22,7 @@ const supportcontact =require('../model/supportContactConfig');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const GroupMembers = require('../model/groupmembers');
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   storageBucket: "gs://thasmai-star-life.appspot.com"
@@ -1495,4 +1496,71 @@ router.put('/discount/:UId', async (req, res) => {
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
+const ApplicationConfig = require('../model/applicationConfig')
+router.put('/update-gurujidate', async (req, res) => {
+  try {
+    console.log('Updating');
+    const id = 11;
+    const {  values } = req.body;
+    console.log(req.body.values)
+
+    // Find the existing record by ID
+    let config = await ApplicationConfig.findByPk(id);
+
+    // If the record doesn't exist, create a new one
+    if (!config) {
+      config = await ApplicationConfig.create({ id });
+    }
+
+    // Convert the array of values to JSON format and update the record
+    config.value = JSON.stringify(values);
+    await config.save();
+
+    return res.status(200).json({ message: 'Application config updated successfully' });
+  } catch (error) {
+    console.error('Error updating application config:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+router.post('/appointment-query', async (req, res) => {
+  try {
+    const queryConditions = req.body.queryConditions;
+    const page = req.body.page || 1; // Default to page 1 if not provided
+    const pageSize = req.body.pageSize || 10; // Default page size to 10 if not provided
+
+    console.log(queryConditions);
+
+    if (!queryConditions || !Array.isArray(queryConditions) || queryConditions.length === 0) {
+      return res.status(400).json({ message: 'Invalid query conditions provided.' });
+    }
+
+    function isNumeric(num) {
+      return !isNaN(num);
+    }
+
+    let sql = "SELECT * FROM sequel.appointments WHERE ";
+    for (let i = 0; i < queryConditions.length; i++) {
+      sql += `${queryConditions[i].field} ${queryConditions[i].operator} ${isNumeric(queryConditions[i].value) ? queryConditions[i].value : `'${queryConditions[i].value}'` } ${queryConditions[i].logicaloperator != "null" ? queryConditions[i].logicaloperator : "" } `;
+    }
+
+    // Apply pagination
+    const offset = (page - 1) * pageSize;
+    sql += `LIMIT ${pageSize} OFFSET ${offset}`;
+
+    console.log(sql);
+
+    const results = await sequelize.query(sql);
+    console.log(results[0]);
+    
+    // Assuming sequelize returns an array of rows in the first element of the results array
+    res.json({ results: results[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
 module.exports = router;
