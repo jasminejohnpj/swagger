@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const { DataTypes, Sequelize } = require('sequelize');
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
@@ -13,7 +12,8 @@ const questions = sequelize.define('questions', {
     ans2: { type: DataTypes.STRING},
     ans3: { type: DataTypes.STRING},
     ans4: { type: DataTypes.STRING},
-    ans5:{ type: DataTypes.STRING}
+    ans5:{ type: DataTypes.STRING},
+    condition:{type:DataTypes.TEXT}
 },
  {
     timestamps: false,
