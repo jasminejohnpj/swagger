@@ -1362,65 +1362,42 @@ router.delete('/group-members/:id', async (req, res) => {
 
 /**
  * @swagger
- * /User/rating/{id}:
+ * /api/rating/{id}:
  *   put:
- *     summary: Update appointment rating
- *     description: Update the rating of an appointment by ID
- *     tags:
- *       - Rating
+ *     summary: Update rating and feedback for an appointment
+ *     description: Update the rating and feedback for a specific appointment using its ID.
  *     parameters:
  *       - in: path
  *         name: id
+ *         description: ID of the appointment to update
  *         required: true
- *         description: ID of the appointment to update rating
  *         schema:
  *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               rating:
- *                 type: string
- *                 description: The new rating for the appointment
+ *       - in: body
+ *         name: rating and feedback
+ *         description: Rating and feedback to update
+ *         required: true
+ *         schema:
+ *           type: object
+ *           properties:
+ *             rating:
+ *               type: string
+ *               description: New rating value
+ *             feedback:
+ *               type: string
+ *               description: New feedback text
  *     responses:
  *       '200':
  *         description: Rating updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   description: Success message indicating rating update completion
  *       '404':
  *         description: Appointment not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   description: Error message indicating appointment not found
  *       '500':
  *         description: Internal Server Error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   description: Internal server error message
  */
 
 router.put('/rating/:id', async (req, res) => {
   const id = req.params.id;
-  const rating = req.body.rating;
+  const {rating , feedback}= req.body;
 
   try {
     const appointment = await Appointment.findOne({ where: { id: id } });
@@ -1428,7 +1405,7 @@ router.put('/rating/:id', async (req, res) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    await Appointment.update({ rating: rating }, { where: { id: id } });
+    await Appointment.update({ rating: rating ,feedback :feedback}, { where: { id: id } });
 
     return res.status(200).json({ message: 'Rating updated successfully' });
   } catch (error) {
@@ -1641,7 +1618,7 @@ router.get('/rulesAndConditions', async (req, res) => {
     }
 
     // Extract the value from the condition field
-    const conditionValue = question.condition;
+    const conditionValue = question.conditions;
 
     // Return the condition value in the API response
     return res.status(200).json({ message: 'Condition value retrieved successfully', condition: conditionValue });

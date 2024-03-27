@@ -54,7 +54,7 @@ const reg = sequelize.define('reg', {
     
  });
 
-sequelize.sync({alter: true})
+sequelize.sync({alter: false})
     .then((data) => {
        // console.log(data);
         console.log('reg table created');

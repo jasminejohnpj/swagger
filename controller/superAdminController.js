@@ -2,7 +2,7 @@ const express = require('express');
 const { sequelize, reg } = require('../model/registration');
 const router = express.Router();
 const {Users} = require('../model/validUsers');
-const { Op } = require("sequelize");
+const { Op, where } = require("sequelize");
 const Distribution = require('../model/distribution');
 const financialconfig = require('../model/financialConfig');
 const BankDetails = require('../model/bankdetails');
@@ -1364,11 +1364,16 @@ router.get('/list-all-appointment', async (req, res) => {
 
       appointmentsWithGroupMembersAndCoupons.push(mergedAppointmentData);
     }
-
+//console.log(appointmentsWithGroupMembersAndCoupons)
+  let modarray =   JSON.parse(JSON.stringify(appointmentsWithGroupMembersAndCoupons))
+.map(i=>{
+  //console.log(i.appointment)
+return i.appointment
+    })
     // Respond with the list of merged appointment data
-    return res.status(200).json({ message: 'Fetching appointments', appointments: appointmentsWithGroupMembersAndCoupons });
+    return res.status(200).json({ message: 'Fetching appointments', appointments: modarray });
   } catch (error) {
-    console.error(error);
+   // console.error(error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -1543,12 +1548,19 @@ router.post('/appointment-query', async (req, res) => {
 
     let sql = "SELECT * FROM sequel.appointments WHERE ";
     for (let i = 0; i < queryConditions.length; i++) {
+      if(queryConditions[i].operator === "between"){
+
+      sql += `${queryConditions[i].field} ${queryConditions[i].operator}  "${queryConditions[i].value.split("-")[0]}" and "${queryConditions[i].value.split("-")[1]}" ${queryConditions[i].logicaloperator != "null" ? queryConditions[i].logicaloperator : "" } `;
+        
+      }
+      else{
       sql += `${queryConditions[i].field} ${queryConditions[i].operator} ${isNumeric(queryConditions[i].value) ? queryConditions[i].value : `'${queryConditions[i].value}'` } ${queryConditions[i].logicaloperator != "null" ? queryConditions[i].logicaloperator : "" } `;
+      }
     }
 
     // Apply pagination
     const offset = (page - 1) * pageSize;
-    sql += `LIMIT ${pageSize} OFFSET ${offset}`;
+    // sql += `LIMIT ${pageSize} OFFSET ${offset}`;
 
     console.log(sql);
 
@@ -1560,6 +1572,29 @@ router.post('/appointment-query', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+router.get('/profiledetails/:UId', async (req, res) => {
+  try {
+    const { UId } = req.params;
+
+    const user = await reg.findOne({ where: { UId }, attributes: ['UId','first_name' ,'last_name' , 'email' ,'phone' , 'DOB' , 'gender' , 'address', 'district','state','pincode','profilePicUrl'] });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const bankDetails = await BankDetails.findOne({ where: { UId } });
+    const meditationData = await meditation.findOne({ where: { UId } });
+
+    return res.status(200).json({
+      user,
+      bankDetails,
+      meditationData
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
